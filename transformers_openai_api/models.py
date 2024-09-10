@@ -1,13 +1,11 @@
 from abc import ABC
-from typing import Any, List, Mapping, Optional
+from typing import Any, List, Mapping, Optional, Dict
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, AutoModelForCausalLM
 
 
-def get_prompts(request: Mapping[str, Any]) -> List[str]:
-    prompt = request['prompt']
-    if isinstance(prompt, str):
-        prompt = [prompt]
-    return prompt
+def get_messages(request: Mapping[str, Any]) -> List[Dict[str,str]]:
+    messages = request['messages']
+    return messages
 
 
 def _completions_auto(
@@ -20,7 +18,7 @@ def _completions_auto(
         auto_echo: bool):
     generate_args = {}
     generate_args.update(generate_config)
-    generate_args.update(request)
+    #generate_args.update(request)
 
     decode_args = {
         "skip_special_tokens": True
@@ -36,7 +34,7 @@ def _completions_auto(
         if 'top_k' not in generate_args:
             generate_args['top_k'] = 0
 
-    prompts = get_prompts(generate_args)
+    messages = get_messages(request)
     echo = generate_args.get('echo', False)
     n = generate_args.get('n', 1)
 
@@ -52,12 +50,11 @@ def _completions_auto(
 
     inputs = []
     prompt_tokens_count = 0
-    for prompt in prompts:
-        input = tokenizer(prompt, return_tensors="pt").input_ids
-        if tokenizer_device is not None:
-            input = input.to(tokenizer_device)
-        prompt_tokens_count += input.size(dim=1)
-        inputs.append(input)
+    input = tokenizer.apply_chat_template(messages, tokenize=True, return_tensors="pt", add_generation_prompt=True)
+    if tokenizer_device is not None:
+        input = input.to(tokenizer_device)
+    inputs.append(input)
+    prompt_tokens_count += input.size(dim=1)
 
     choices = []
     completion_tokens_count = 0
@@ -67,10 +64,10 @@ def _completions_auto(
             completion_tokens_count += len(output)
             text = tokenizer.decode(output, **decode_args)
             if echo and not auto_echo:
-                text = prompts[i] + text
+                text = inputs[i] + text
             choices.append({
-                'text': text,
-                'index': i,
+                'message': {"role": "assistant", "content": text},
+                "index": i
             })
 
     return {

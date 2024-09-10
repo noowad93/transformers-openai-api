@@ -39,6 +39,8 @@ def convert_model_config(val: Optional[Mapping[str, Any]]) -> Mapping[str, Any]:
             if key == 'torch_dtype':
                 if value == 'float16':
                     config['torch_dtype'] = torch.float16
+                elif value == 'bfloat16':
+                    config['torch_dtype'] = torch.bfloat16
                 elif value == 'float32':
                     config['torch_dtype'] = torch.float32
                 elif value == 'int8':
@@ -106,7 +108,7 @@ def v1_engines():
     }))
 
 
-@app.route('/v1/completions', methods=['POST'])
+@app.route('/v1/chat/completions', methods=['POST'])
 @check_token
 def v1_completions():
     return completion(request.json['model'])
@@ -138,7 +140,7 @@ def make_transformers_openai_api(config_path: str) -> Flask:
         if config.get('ENABLED', True) == False:
             continue
         model_config = convert_model_config(config.get('MODEL_CONFIG'))
-        model_device = config.get('MODEL_DEVICE', 'cuda')
+        model_device = config.get('MODEL_DEVICE', None)
         tokenizer_config = convert_tokenizer_config(
             config.get('TOKENIZER_CONFIG'))
         tokenizer_device = config.get('TOKENIZER_DEVICE', 'cuda')
